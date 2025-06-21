@@ -33,9 +33,12 @@ public class MetricController {
   VALUES (
     UNHEX(REPLACE(UUID(),'-','')),      -- id gerado no servidor
     UNHEX(REPLACE(?,'-','')),           -- session_id (String UUID)
-    ?,                                   -- nome do evento
+    ?,                                  -- nome do evento
     CAST(? AS JSON)                     -- payload JSON
   )
-""", ev.sessionId().toString(), ev.name(), json);
+  """,
+                ev.sessionId().toString(),
+                ev.name(),
+                json);
     }
 }
