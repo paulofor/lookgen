@@ -1,0 +1,9 @@
+{
+  "name": "@lookgen/frontend",
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {}
+}

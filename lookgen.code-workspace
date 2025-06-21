@@ -1,0 +1,19 @@
+{
+  "folders": [
+    {
+      "path": "frontend"
+    },
+    {
+      "path": "ui-backend"
+    },
+    {
+      "path": "styler-service"
+    },
+    {
+      "path": "notification-service"
+    },
+    {
+      "path": "shared"
+    }
+  ]
+}
