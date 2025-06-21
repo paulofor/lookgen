@@ -1,0 +1,10 @@
+styler:
+  poll-ms: 60000
+openai:
+  api-key: dummy
+  read-timeout: 120s
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
