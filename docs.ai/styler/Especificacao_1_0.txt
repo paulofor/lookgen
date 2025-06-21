@@ -1,0 +1,131 @@
+# Styler‑Service – Codex‑Ready Spec (MVP)
+
+<!--
+Esta versão é otimizada para ser usada como "contexto" pelo OpenAI Codex/Copilot.  
+👉 Sem tabelas HTML, diagramas ou formatação muito pesada.  
+👉 Cada seção começa com `##` ou `###`.  
+👉 Tudo em texto puro ou blocos markdown de código.  
+👉 Termos‑chave aparecem em **CAPS** para facilitar busca.
+-->
+
+## META
+
+* VERSION: `0.2` — 2025‑06‑20
+* PURPOSE: Micro‑serviço que, periodicamente, pega 5 FOTOS do usuário, chama **GPT‑4o‑mini**, grava o ESBOÇO e muda o STAGE do usuário.
+* SCALE: volume ≈ <100 sketches/dia ⇒ **SEM Redis / SEM Streaming**.
+
+---
+
+## TECH STACK
+
+* **Spring Boot 3.3** (MVC) — Kotlin 1.9
+* **PostgreSQL 15** — tabelas `user`, `photo`, `sketch`
+* **OpenAI Chat API** (`gpt-4o-mini`, `stream=false`)
+* Container: `ghcr.io/lookgen/styler:<sha>`
+* Deploy inicial: **1 pod** (2 vCPU, 1 Gi)
+
+---
+
+## DATA MODEL (PostgreSQL)
+
+```
+USER(id PK BIGINT, stage ENUM, retry_count SMALLINT, updated_at TIMESTAMP)
+PHOTO(id PK, user_id FK, url TEXT, ord SMALLINT)
+SKETCH(id PK, user_id FK UNIQUE, content TEXT, tokens INT, created_at TIMESTAMP)
+```
+
+* STAGE values: `CAPTURED` → `PENDING_SKETCH` → `SKETCH_READY` ↔ `SKETCH_ERROR`.
+
+---
+
+## PUBLIC API
+
+```
+GET  /actuator/health          # liveness / readiness
+GET  /v1/sketch/{uid}          # returns {content, tokens}
+POST /v1/admin/replay          # admin: reset stage & reprocess
+```
+
+* Frontend faz **poll** em `/v1/sketch/{uid}` até 200 OK.
+
+---
+
+## SCHEDULER LOGIC (pseudocode)
+
+```kotlin
+@Scheduled(fixedDelay = 60_000)
+@Transactional
+fun tick() {
+  val users = userRepo.findPending(limit = 5) // SELECT ... FOR UPDATE SKIP LOCKED
+  users.forEach { u ->
+    processUser(u)
+  }
+}
+
+fun processUser(u: User) {
+  val photos = photoRepo.findByUser(u.id)      // must be 5
+  if (photos.size != 5) { fail(u) }
+
+  val sketch = openAi.createSketch(photos.urls)
+  sketchRepo.save(sketch)
+  u.stage = Stage.SKETCH_READY
+}
+```
+
+* **Retry:** até 3 tentativas (expo backoff). Se falha ⇒ `u.stage = SKETCH_ERROR`.
+
+---
+
+## OPENAI PAYLOAD (abridged)
+
+```jsonc
+{
+  "model": "gpt-4o-mini",
+  "stream": false,
+  "messages": [
+    {"role":"system","content":"Você é um estilista …"},
+    {"role":"user","content":[
+      {"type":"text","text":"Crie um esboço:"},
+      {"type":"image_url","image_url":{"url":"${url1}"}},
+      {"type":"image_url","image_url":{"url":"${url2}"}},
+      {"type":"image_url","image_url":{"url":"${url3}"}},
+      {"type":"image_url","image_url":{"url":"${url4}"}},
+      {"type":"image_url","image_url":{"url":"${url5}"}},
+      {"type":"text","text":"Bullets, paleta e peças‑chave."}
+    ]}
+  ]
+}
+```
+
+---
+
+## CONFIG (application.yaml – excerto)
+
+```yaml
+styler:
+  poll-ms: 60000   # 60 s
+openai:
+  api-key: ${OPENAI_API_KEY}
+  read-timeout: 120s
+```
+
+---
+
+## METRICS (Micrometer)
+
+* `sketch_jobs_total{state="done|error"}`
+* `sketch_latency_seconds` (Timer)
+* `openai_requests_total{status}`
+* `openai_token_usage_total{type}`
+
+---
+
+## DONE CRITERIA (MVP)
+
+* Migrations Flyway ✅
+* Scheduler gravando esboço ✅
+* Endpoint GET `/v1/sketch/{uid}` ✅
+* Dockerfile & Helm chart ✅
+* Grafana dashboard básico ✅
+
+<!-- EOF Codex‑ready spec -->
