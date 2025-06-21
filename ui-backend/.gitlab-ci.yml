@@ -1,0 +1,50 @@
+stages:
+  - build
+  - deploy
+
+# ==================================================================
+# Reaproveita o cache do repositório Maven por branch (↓ acelera CI)
+# ==================================================================
+cache:
+  key: ${CI_COMMIT_REF_SLUG}-m2
+  paths:
+    - .m2/repository            # ↓ pasta onde o Maven guarda dependências
+  policy: pull-push
+
+# ──────────────────────────────
+# 1) BUILD – compilar e testar
+# ──────────────────────────────
+build:
+  stage: build
+  image: maven:3.9.8-eclipse-temurin-21      # JDK 21 + Maven 3.9
+  script:
+    - mvn -B verify                       # roda testes
+    - mvn -B package -DskipTests          # gera JAR na pasta target/
+  artifacts:
+    paths:
+      - target/*.jar                      # leva o JAR para o stage deploy
+    expire_in: 1 week
+
+
+# ──────────────────────────────
+# 2) DEPLOY – enviar e reiniciar
+# ──────────────────────────────
+deploy:
+  stage: deploy
+  image: alpine:latest
+  only:
+    - main
+
+  before_script:
+    - apk add --no-cache openssh rsync
+    - echo "$SSH_PRIVATE_KEY" > id_rsa
+    - chmod 600 id_rsa
+    - mkdir -p ~/.ssh
+    - ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+
+  script:
+    - mv target/*.jar target/app.jar
+    - rsync -az --delete -e "ssh -i id_rsa -o StrictHostKeyChecking=no" target/app.jar lookgen@$VPS_HOST:/opt/lookgen/app/
+    - ssh  -i id_rsa lookgen@$VPS_HOST "sudo -n /usr/bin/systemctl restart lookgen-backend.service"
+
+
