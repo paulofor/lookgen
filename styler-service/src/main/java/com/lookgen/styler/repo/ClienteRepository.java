@@ -10,11 +10,8 @@ import java.util.List;
 
 @Repository
 public interface ClienteRepository extends JpaRepository<Cliente, Long> {
-    // MySQL requires the FOR UPDATE clause to appear before LIMIT
-    // otherwise the database will return a syntax error. See issue #n/a
-    // on some installations the previous query failed with:
-    // "You have an error in your SQL syntax; ... near 'SKIP LOCKED'"
-    // Reordering the clauses fixes the problem.
-    @Query(value = "SELECT * FROM cliente WHERE precisa_processamento = 1 FOR UPDATE SKIP LOCKED LIMIT :limit", nativeQuery = true)
+    // Simpler SQL compliant with most databases. The locking clause
+    // appears after LIMIT as required by MySQL.
+    @Query(value = "SELECT * FROM cliente WHERE precisa_processamento = 1 LIMIT :limit FOR UPDATE", nativeQuery = true)
     List<Cliente> findPending(@Param("limit") int limit);
 }
