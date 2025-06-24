@@ -15,7 +15,7 @@ Repositório com todos os serviços que compõem o projeto **Lookgen**.
 
 - Node.js 20+ e pnpm
 - JDK 17 ou superior
-- MySQL 8
+- MySQL 5.7+
 
 Defina as variáveis `SPRING_DATASOURCE_USERNAME` e `SPRING_DATASOURCE_PASSWORD` antes de iniciar os serviços.
 
