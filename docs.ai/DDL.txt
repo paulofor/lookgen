@@ -1,0 +1,67 @@
+CREATE TABLE `cliente` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `nome` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `email` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `telefone` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `data_criacao` datetime DEFAULT CURRENT_TIMESTAMP,
+  `ativo` tinyint(1) DEFAULT '1',
+  `whatsapp` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `precisa_processamento` tinyint(1) DEFAULT '1',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `email` (`email`)
+) ENGINE=InnoDB AUTO_INCREMENT=26 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `estilo` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `nome` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `descricao` text COLLATE utf8mb4_unicode_ci,
+  `cliente_id` bigint(20) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `FKgid4fnuvs6cjmd72ux83m5bpg` (`cliente_id`),
+  CONSTRAINT `FKgid4fnuvs6cjmd72ux83m5bpg` FOREIGN KEY (`cliente_id`) REFERENCES `cliente` (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+CREATE TABLE `foto_item` (
+  `id` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `cliente_id` bigint(20) DEFAULT NULL,
+  `categoria` enum('ROUPA','SAPATO','ACES') COLLATE utf8mb4_unicode_ci DEFAULT 'ROUPA',
+  `cor` varchar(60) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `data_upload` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `tipo` varchar(40) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `peca_nome` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `caminho_arquivo` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_foto_item_cliente` (`cliente_id`),
+  CONSTRAINT `fk_foto_item_cliente` FOREIGN KEY (`cliente_id`) REFERENCES `cliente` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+CREATE TABLE `foto_gerada` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `cliente_id` bigint(20) NOT NULL,
+  `estilo_id` bigint(20) DEFAULT NULL,
+  `prompt_usado` text COLLATE utf8mb4_unicode_ci,
+  `descricao_look` text COLLATE utf8mb4_unicode_ci,
+  `url_imagem_final` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `data_geracao` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `cliente_id` (`cliente_id`),
+  KEY `estilo_id` (`estilo_id`),
+  CONSTRAINT `foto_gerada_ibfk_1` FOREIGN KEY (`cliente_id`) REFERENCES `cliente` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `foto_gerada_ibfk_2` FOREIGN KEY (`estilo_id`) REFERENCES `estilo` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+CREATE TABLE `foto_pessoa` (
+  `id` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `cliente_id` bigint(20) NOT NULL,
+  `url` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `caminho_arquivo` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `data_upload` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `observacoes` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_foto_pessoa_cliente` (`cliente_id`),
+  CONSTRAINT `fk_foto_pessoa_cliente` FOREIGN KEY (`cliente_id`) REFERENCES `cliente` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
