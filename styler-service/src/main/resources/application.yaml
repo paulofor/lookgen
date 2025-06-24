@@ -1,7 +1,7 @@
 styler:
   poll-ms: 60000
 openai:
-  api-key: dummy
+  api-key: ${OPENAI_API_KEY}
   read-timeout: 120s
 spring:
   datasource:
