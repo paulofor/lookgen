@@ -10,11 +10,10 @@ import java.util.List;
 
 @Repository
 public interface ClienteRepository extends JpaRepository<Cliente, Long> {
-    // MySQL requires the FOR UPDATE clause to appear before LIMIT
-    // otherwise the database will return a syntax error. See issue #n/a
-    // on some installations the previous query failed with:
-    // "You have an error in your SQL syntax; ... near 'SKIP LOCKED'"
-    // Reordering the clauses fixes the problem.
-    @Query(value = "SELECT * FROM cliente WHERE precisa_processamento = 1 FOR UPDATE SKIP LOCKED LIMIT :limit", nativeQuery = true)
+    // Algumas instalações do MySQL geravam erro de sintaxe ao utilizar
+    // o `FOR UPDATE SKIP LOCKED` antes do `LIMIT`. Conforme a sintaxe
+    // oficial do MySQL 8, o `LIMIT` deve vir primeiro, seguido pelo
+    // `FOR UPDATE SKIP LOCKED` no final da consulta.
+    @Query(value = "SELECT * FROM cliente WHERE precisa_processamento = 1 LIMIT :limit FOR UPDATE SKIP LOCKED", nativeQuery = true)
     List<Cliente> findPending(@Param("limit") int limit);
 }
