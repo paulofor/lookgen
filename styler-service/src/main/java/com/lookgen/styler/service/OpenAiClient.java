@@ -2,10 +2,13 @@ package com.lookgen.styler.service;
 
 import com.lookgen.styler.config.OpenAiProperties;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.util.*;
 
@@ -15,6 +18,7 @@ public class OpenAiClient {
     private final OpenAiProperties props;
     private final MeterRegistry meterRegistry;
     private final WebClient client;
+    private static final Logger log = LoggerFactory.getLogger(OpenAiClient.class);
 
     public static class Response {
         private final String content;
@@ -53,6 +57,9 @@ public class OpenAiClient {
         ));
 
         try {
+            if (log.isDebugEnabled()) {
+                log.debug("Enviando requisição ao OpenAI: {}", payload);
+            }
             @SuppressWarnings("unchecked")
             Map<String, Object> result = client.post()
                     .contentType(MediaType.APPLICATION_JSON)
@@ -92,8 +99,13 @@ public class OpenAiClient {
                 }
             }
             return new Response(content, tokens);
+        } catch (WebClientResponseException ex) {
+            meterRegistry.counter("openai_requests_total", "status", "error").increment();
+            log.error("Erro na chamada ao OpenAI - status: {}, body: {}", ex.getStatusCode().value(), ex.getResponseBodyAsString());
+            throw ex;
         } catch (Exception ex) {
             meterRegistry.counter("openai_requests_total", "status", "error").increment();
+            log.error("Falha inesperada na chamada ao OpenAI", ex);
             throw ex;
         }
     }
