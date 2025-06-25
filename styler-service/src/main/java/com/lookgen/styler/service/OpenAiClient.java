@@ -114,7 +114,12 @@ public class OpenAiClient {
         List<Object> list = new ArrayList<>();
         list.add(Map.of("type", "text", "text", "Crie um esboço:"));
         for (String u : urls) {
-            list.add(Map.of("type", "image_url", "image_url", Map.of("url", u)));
+            list.add(Map.of(
+                    "type", "image_url",
+                    "image_url", Map.of(
+                            "url", u,
+                            "detail", "low"
+                    )));
         }
         if (style != null) {
             list.add(Map.of("type", "text", "text", style));
