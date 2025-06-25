@@ -1,5 +1,6 @@
 styler:
   poll-ms: 60000
+  image-base-url: ${IMAGE_BASE_URL:http://localhost:8080}
 openai:
   api-key: ${OPENAI_API_KEY}
   read-timeout: 120s

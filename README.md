@@ -17,7 +17,7 @@ Repositório com todos os serviços que compõem o projeto **Lookgen**.
 - JDK 17 ou superior
 - MySQL 8
 
-Defina as variáveis `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` e `OPENAI_API_KEY` antes de iniciar os serviços.
+Defina as variáveis `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, `OPENAI_API_KEY` e `IMAGE_BASE_URL` antes de iniciar os serviços.
 
 ## Build e Execução
 
