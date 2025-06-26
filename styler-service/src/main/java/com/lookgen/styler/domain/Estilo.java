@@ -11,6 +11,7 @@ public class Estilo {
 
     private String nome;
 
+    @Column(columnDefinition = "TEXT")
     private String descricao;
 
     @Column(name = "cliente_id")
