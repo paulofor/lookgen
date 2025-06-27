@@ -21,3 +21,5 @@ management:
     web:
       exposure:
         include: health,prometheus
+gcp:
+  bucket: ${GCP_BUCKET}

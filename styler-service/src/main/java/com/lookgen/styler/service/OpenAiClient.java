@@ -9,6 +9,8 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import com.lookgen.styler.service.GcpStorageService;
+import reactor.core.publisher.Mono;
 
 import java.util.*;
 
@@ -19,6 +21,8 @@ public class OpenAiClient {
     private final MeterRegistry meterRegistry;
     private final WebClient chatClient;
     private final WebClient imageClient;
+    private final WebClient downloadClient;
+    private final GcpStorageService storage;
     private static final Logger log = LoggerFactory.getLogger(OpenAiClient.class);
 
     public static class Response {
@@ -39,9 +43,10 @@ public class OpenAiClient {
         }
     }
 
-    public OpenAiClient(OpenAiProperties props, MeterRegistry meterRegistry) {
+    public OpenAiClient(OpenAiProperties props, MeterRegistry meterRegistry, GcpStorageService storage) {
         this.props = props;
         this.meterRegistry = meterRegistry;
+        this.storage = storage;
         this.chatClient = WebClient.builder()
                 .baseUrl("https://api.openai.com/v1/chat/completions")
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + props.getApiKey())
@@ -50,6 +55,7 @@ public class OpenAiClient {
                 .baseUrl("https://api.openai.com/v1/images/generations")
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + props.getApiKey())
                 .build();
+        this.downloadClient = WebClient.builder().build();
     }
 
     public Response createSketch(List<String> urls, String style) {
@@ -203,6 +209,14 @@ public class OpenAiClient {
                         }
                     }
                 }
+            }
+            if (!url.isBlank()) {
+                byte[] imgBytes = downloadClient.get()
+                        .uri(url)
+                        .retrieve()
+                        .bodyToMono(byte[].class)
+                        .block(props.getReadTimeout());
+                url = storage.upload(imgBytes, "image/png");
             }
 
             return new Response(url, tokens);
