@@ -61,6 +61,8 @@ public class OpenAiClient {
                 Map.of("role", "user", "content", buildContent(urls, style))
         ));
 
+        log.info("Prompt (sketch) executado: {}", payload);
+
         try {
             if (log.isDebugEnabled()) {
                 log.debug("Enviando requisição ao OpenAI: {}", payload);
@@ -151,6 +153,8 @@ public class OpenAiClient {
             }
             Map<?, ?> message = choice == null ? null : (Map<?, ?>) choice.get("message");
             String prompt = message == null ? "" : Objects.toString(message.get("content"), "");
+
+            log.info("Prompt (imagem) executado: {}", prompt);
 
             Map<?, ?> usage = chatResult == null ? null : (Map<?, ?>) chatResult.get("usage");
             int tokens = 0;
