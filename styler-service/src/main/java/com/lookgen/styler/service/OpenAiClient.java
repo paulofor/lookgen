@@ -17,7 +17,8 @@ public class OpenAiClient {
 
     private final OpenAiProperties props;
     private final MeterRegistry meterRegistry;
-    private final WebClient client;
+    private final WebClient chatClient;
+    private final WebClient imageClient;
     private static final Logger log = LoggerFactory.getLogger(OpenAiClient.class);
 
     public static class Response {
@@ -41,8 +42,12 @@ public class OpenAiClient {
     public OpenAiClient(OpenAiProperties props, MeterRegistry meterRegistry) {
         this.props = props;
         this.meterRegistry = meterRegistry;
-        this.client = WebClient.builder()
+        this.chatClient = WebClient.builder()
                 .baseUrl("https://api.openai.com/v1/chat/completions")
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + props.getApiKey())
+                .build();
+        this.imageClient = WebClient.builder()
+                .baseUrl("https://api.openai.com/v1/images/generations")
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + props.getApiKey())
                 .build();
     }
@@ -61,7 +66,7 @@ public class OpenAiClient {
                 log.debug("Enviando requisição ao OpenAI: {}", payload);
             }
             @SuppressWarnings("unchecked")
-            Map<String, Object> result = client.post()
+            Map<String, Object> result = chatClient.post()
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(payload)
                     .retrieve()
@@ -110,6 +115,104 @@ public class OpenAiClient {
         }
     }
 
+    public Response createLookImage(List<String> urls, String style) {
+        Map<String, Object> chatPayload = new HashMap<>();
+        chatPayload.put("model", "gpt-4o-mini");
+        chatPayload.put("stream", false);
+        chatPayload.put("messages", List.of(
+                Map.of("role", "system", "content", "Você é um estilista"),
+                Map.of("role", "user", "content", buildPromptContent(urls, style))
+        ));
+
+        try {
+            if (log.isDebugEnabled()) {
+                log.debug("Enviando requisição ao OpenAI (chat): {}", chatPayload);
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> chatResult = chatClient.post()
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(chatPayload)
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .doOnError(e -> meterRegistry.counter("openai_requests_total", "status", "error").increment())
+                    .block(props.getReadTimeout());
+
+            meterRegistry.counter("openai_requests_total", "status", "success").increment();
+
+            Map<?, ?> choice = null;
+            if (chatResult != null) {
+                Object choicesObj = chatResult.get("choices");
+                if (choicesObj instanceof List<?> list && !list.isEmpty()) {
+                    Object first = list.get(0);
+                    if (first instanceof Map<?, ?> map) {
+                        choice = map;
+                    }
+                }
+            }
+            Map<?, ?> message = choice == null ? null : (Map<?, ?>) choice.get("message");
+            String prompt = message == null ? "" : Objects.toString(message.get("content"), "");
+
+            Map<?, ?> usage = chatResult == null ? null : (Map<?, ?>) chatResult.get("usage");
+            int tokens = 0;
+            if (usage != null) {
+                Object total = usage.get("total_tokens");
+                if (total instanceof Number n) {
+                    tokens = n.intValue();
+                }
+                for (Map.Entry<?, ?> entry : usage.entrySet()) {
+                    Object v = entry.getValue();
+                    if (v instanceof Number n) {
+                        meterRegistry.counter("openai_token_usage_total", "type", entry.getKey().toString())
+                                .increment(n.doubleValue());
+                    }
+                }
+            }
+
+            Map<String, Object> imgPayload = new HashMap<>();
+            imgPayload.put("model", "dall-e-3");
+            imgPayload.put("prompt", prompt);
+            imgPayload.put("n", 1);
+            imgPayload.put("size", "1024x1024");
+
+            if (log.isDebugEnabled()) {
+                log.debug("Enviando requisição ao OpenAI (image): {}", imgPayload);
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> imgResult = imageClient.post()
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(imgPayload)
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .doOnError(e -> meterRegistry.counter("openai_requests_total", "status", "error").increment())
+                    .block(props.getReadTimeout());
+
+            String url = "";
+            if (imgResult != null) {
+                Object dataObj = imgResult.get("data");
+                if (dataObj instanceof List<?> list && !list.isEmpty()) {
+                    Object first = list.get(0);
+                    if (first instanceof Map<?, ?> map) {
+                        Object u = map.get("url");
+                        if (u != null) {
+                            url = u.toString();
+                        }
+                    }
+                }
+            }
+
+            return new Response(url, tokens);
+        } catch (WebClientResponseException ex) {
+            meterRegistry.counter("openai_requests_total", "status", "error").increment();
+            log.error("Erro na chamada ao OpenAI", ex);
+            throw ex;
+        } catch (Exception ex) {
+            meterRegistry.counter("openai_requests_total", "status", "error").increment();
+            log.error("Falha inesperada na chamada ao OpenAI", ex);
+            throw ex;
+        }
+    }
+
     private List<Object> buildContent(List<String> urls, String style) {
         List<Object> list = new ArrayList<>();
         list.add(Map.of("type", "text", "text", "Crie um esboço:"));
@@ -125,6 +228,25 @@ public class OpenAiClient {
             list.add(Map.of("type", "text", "text", style));
         }
         list.add(Map.of("type", "text", "text", "Bullets, paleta e peças-chave."));
+        return list;
+    }
+
+    private List<Object> buildPromptContent(List<String> urls, String style) {
+        List<Object> list = new ArrayList<>();
+        list.add(Map.of("type", "text", "text", "Gere um prompt curto para DALL-E:"));
+        for (String u : urls) {
+            list.add(Map.of(
+                    "type", "image_url",
+                    "image_url", Map.of(
+                            "url", u,
+                            "detail", "low"
+                    )));
+        }
+        if (style != null) {
+            list.add(Map.of("type", "text", "text", style));
+        }
+        list.add(Map.of("type", "text", "text", "Descreva uma combinação das peças em estilo de desenho de estilista profissional."));
+        list.add(Map.of("type", "text", "text", "Responda apenas com o prompt."));
         return list;
     }
 }

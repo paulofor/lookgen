@@ -11,7 +11,7 @@ Esta versão é otimizada para ser usada como "contexto" pelo OpenAI Codex/Copil
 ## META
 
 * VERSION: `0.2` — 2025‑06‑20
-* PURPOSE: Micro‑serviço que, periodicamente, pega 5 FOTOS do usuário, chama **GPT‑4o‑mini**, grava o ESBOÇO e muda o STAGE do usuário.
+* PURPOSE: Micro‑serviço que, periodicamente, pega 5 FOTOS do usuário, usa **GPT‑4o‑mini** para gerar um PROMPT e o envia ao **DALL‑E 3** para criar uma IMAGEM de combinação.
 * SCALE: volume ≈ <100 sketches/dia ⇒ **SEM Redis / SEM Streaming**.
 
 ---
@@ -66,7 +66,7 @@ fun processUser(u: User) {
   val photos = photoRepo.findByUser(u.id)      // must be 5
   if (photos.size != 5) { fail(u) }
 
-  val sketch = openAi.createSketch(photos.urls)
+  val sketch = openAi.createLookImage(photos.urls)
   sketchRepo.save(sketch)
   u.stage = Stage.SKETCH_READY
 }
@@ -76,7 +76,9 @@ fun processUser(u: User) {
 
 ---
 
-## OPENAI PAYLOAD (abridged)
+## OPENAI FLOW
+
+1️⃣ `POST /v1/chat/completions`
 
 ```jsonc
 {
@@ -85,15 +87,27 @@ fun processUser(u: User) {
   "messages": [
     {"role":"system","content":"Você é um estilista …"},
     {"role":"user","content":[
-      {"type":"text","text":"Crie um esboço:"},
+      {"type":"text","text":"Gere um prompt curto para DALL-E:"},
       {"type":"image_url","image_url":{"url":"${url1}"}},
       {"type":"image_url","image_url":{"url":"${url2}"}},
       {"type":"image_url","image_url":{"url":"${url3}"}},
       {"type":"image_url","image_url":{"url":"${url4}"}},
       {"type":"image_url","image_url":{"url":"${url5}"}},
-      {"type":"text","text":"Bullets, paleta e peças‑chave."}
+      {"type":"text","text":"Descreva uma combinação das peças em estilo de desenho."},
+      {"type":"text","text":"Responda apenas com o prompt."}
     ]}
   ]
+}
+```
+
+2️⃣ `POST /v1/images/generations`
+
+```jsonc
+{
+  "model": "dall-e-3",
+  "prompt": "${prompt}" ,
+  "n": 1,
+  "size": "1024x1024"
 }
 ```
 
