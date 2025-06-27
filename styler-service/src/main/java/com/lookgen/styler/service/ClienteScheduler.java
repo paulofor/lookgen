@@ -64,7 +64,7 @@ public class ClienteScheduler {
                     .toList();
             Estilo estilo = estiloRepo.findFirstByClienteId(cli.getId());
             String style = estilo == null ? null : estilo.getNome();
-            OpenAiClient.Response result = openAi.createSketch(urls, style);
+            OpenAiClient.Response result = openAi.createLookImage(urls, style);
             if (estilo == null) {
                 estilo = new Estilo();
                 estilo.setClienteId(cli.getId());
